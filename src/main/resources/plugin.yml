@@ -1,0 +1,20 @@
+name: BottledExpConverter
+version: ${version}
+main: net.mofucraft.bottledexpconverter.BottledExpConverter
+api-version: "1.21"
+description: 旧形式のBottledExpをCMI互換形式に変換するプラグイン
+author: MofuCraft
+
+commands:
+  bexpconvert:
+    description: BottledExp変換コマンド
+    usage: /bexpconvert <convert|reload|status>
+    aliases: [bexpc]
+
+permissions:
+  bottledexpconverter.convert:
+    description: BottledExpを変換する権限
+    default: op
+  bottledexpconverter.reload:
+    description: 設定を再読み込みする権限
+    default: op
