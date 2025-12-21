@@ -10,7 +10,7 @@
 #   - アイテムを拾った時
 #   - インベントリでアイテムをクリックした時
 #   - アイテムを使用しようとした時
-# false の場合は /bottledexp convert コマンドでのみ変換できます
+# false の場合は /bexpconvert convert コマンドでのみ変換できます
 # デフォルト: false（安全のため手動変換推奨）
 auto-convert: false
 
