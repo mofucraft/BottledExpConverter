@@ -7,9 +7,13 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.bukkit.event.block.Action;
 import org.bukkit.event.entity.EntityPickupItemEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryOpenEvent;
+import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 
 /**
@@ -23,6 +27,50 @@ public class ItemListener implements Listener {
 
     public ItemListener(BottledExpConverter plugin) {
         this.plugin = plugin;
+    }
+
+    /**
+     * エンダーチェストを開いた時の処理
+     * エンダーチェスト内のアイテムをスキャンして変換
+     */
+    @EventHandler(priority = EventPriority.NORMAL)
+    public void onInventoryOpen(InventoryOpenEvent event) {
+        if (!plugin.isAutoConvert()) {
+            return;
+        }
+
+        if (!(event.getPlayer() instanceof Player player)) {
+            return;
+        }
+
+        Inventory inventory = event.getInventory();
+        if (inventory.getType() != InventoryType.ENDER_CHEST) {
+            return;
+        }
+
+        ExpBottleConverter converter = plugin.getConverter();
+        int convertedCount = 0;
+        long totalExp = 0;
+
+        for (int i = 0; i < inventory.getSize(); i++) {
+            ItemStack item = inventory.getItem(i);
+            if (item != null && !item.getType().isAir() && converter.isLegacyBottledExp(item)) {
+                ConvertResult result = converter.convert(item);
+                if (result.success()) {
+                    convertedCount++;
+                    totalExp += result.storedExp();
+                    if (plugin.isDebug()) {
+                        plugin.getLogger().info("[Debug] " + player.getName() +
+                                " のエンダーチェスト スロット " + i + " のBottledExpを変換: Exp = " + result.storedExp());
+                    }
+                }
+            }
+        }
+
+        if (convertedCount > 0 && plugin.isNotifyPlayer()) {
+            player.sendMessage(PREFIX + "§aエンダーチェスト内の" + convertedCount + "個のBottledExpを自動変換しました");
+            player.sendMessage("  §7合計経験値: §f" + totalExp);
+        }
     }
 
     /**
@@ -70,18 +118,51 @@ public class ItemListener implements Listener {
 
     /**
      * アイテムを使用しようとした時の処理
+     * 旧形式のBottledExpを投げようとした場合はキャンセルして変換
      */
-    @EventHandler(priority = EventPriority.NORMAL)
+    @EventHandler(priority = EventPriority.LOWEST)
     public void onPlayerInteract(PlayerInteractEvent event) {
         if (!plugin.isAutoConvert()) {
+            return;
+        }
+
+        // 右クリック（投擲動作）のみ処理
+        Action action = event.getAction();
+        if (action != Action.RIGHT_CLICK_AIR && action != Action.RIGHT_CLICK_BLOCK) {
             return;
         }
 
         Player player = event.getPlayer();
         ItemStack item = event.getItem();
 
-        if (item != null && !item.getType().isAir()) {
-            tryConvert(player, item, "使用");
+        if (item == null || item.getType().isAir()) {
+            return;
+        }
+
+        ExpBottleConverter converter = plugin.getConverter();
+
+        // 旧形式のBottledExpでない場合は通常通り投げられる
+        if (!converter.isLegacyBottledExp(item)) {
+            return;
+        }
+
+        // 旧形式のBottledExpを投げようとした場合
+        // イベントをキャンセルして変換
+        event.setCancelled(true);
+
+        ConvertResult result = converter.convert(item);
+
+        if (result.success()) {
+            if (plugin.isDebug()) {
+                plugin.getLogger().info("[Debug] " + player.getName() +
+                        " のBottledExpを投擲前に変換: Exp = " + result.storedExp());
+            }
+
+            if (plugin.isNotifyPlayer()) {
+                player.sendMessage(PREFIX + "§aBottledExpを変換しました。もう一度投げてください (Exp: " + result.storedExp() + ")");
+            }
+        } else {
+            player.sendMessage(PREFIX + "§c変換に失敗しました: " + result.getMessage());
         }
     }
 
